@@ -1,0 +1,61 @@
+name: Deploy Feature Branch on QA Environment - AWS
+run-name: ${{ github.head_ref }} deployed to QA by @${{ github.actor }} - AWS
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [master]
+
+env:
+  ARGO_URL: ${{ vars.ARGO_URL }}
+  ARGO_USER: ${{ vars.ARGO_USER }}
+  ACR_URL: ${{ vars.AWS_ACR_URL }}
+  ARGO_TOKEN: ${{ secrets.ARGO_TOKEN }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  ARGO_ENV: qa
+  AWS_REGION: us-east-1
+  BUILD_TYPE: latest
+
+jobs:
+  deploy-on-qa:
+    name: Deploy Feature Branch on QA Environment
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+        
+    - name: Set Image Name
+      run: |
+        echo "IMAGE_NAME=${GITHUB_REPOSITORY#*/}" >> $GITHUB_ENV
+
+    - name: Login to AWS ECR with AWS CLI Container
+      run: |
+        aws_token=$(docker run --rm \
+          -e AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID }} \
+          -e AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY }} \
+          -e AWS_REGION=${{ env.AWS_REGION }} \
+          amazon/aws-cli:latest \
+          ecr get-login-password --region ${{ env.AWS_REGION }})
+        echo "$aws_token" | docker login ${{ env.ACR_URL }} --username AWS --password-stdin
+        
+    - name: Build Docker Image
+      run: |
+        docker build -t ${{ env.IMAGE_NAME }}:${{ env.BUILD_TYPE }} --build-arg NAMESPACE=${{ env.ARGO_ENV }} .
+        
+    - name: Push Docker Image to Artifact Registry
+      run: |
+        docker tag ${{ env.IMAGE_NAME }}:${{ env.BUILD_TYPE }} ${{ env.ACR_URL }}/${{ env.IMAGE_NAME }}:${{ env.BUILD_TYPE }}
+        docker push ${{ env.ACR_URL }}/${{ env.IMAGE_NAME }}:${{ env.BUILD_TYPE }}
+
+    - name: Restart Argo-CD Application
+      run: |
+        APP="${{ env.ARGO_ENV }}-${{ env.IMAGE_NAME }}"
+        BASE="${{ env.ARGO_URL }}"
+        TOKEN="${{ env.ARGO_TOKEN }}"
+
+        curl -s -X DELETE \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer $TOKEN" \
+          "$BASE/api/v1/applications/$APP"

@@ -1,0 +1,20 @@
+import { Controller, VERSION_NEUTRAL, Get } from '@nestjs/common';
+import {
+  HealthCheck,
+  HealthCheckService,
+  MongooseHealthIndicator,
+} from '@nestjs/terminus';
+
+@Controller({ path: 'health', version: VERSION_NEUTRAL })
+export class HealthController {
+  constructor(
+    private readonly health: HealthCheckService,
+    private readonly mongoose: MongooseHealthIndicator,
+  ) {}
+
+  @Get()
+  @HealthCheck()
+  check() {
+    return this.health.check([async () => this.mongoose.pingCheck('mongodb')]);
+  }
+}

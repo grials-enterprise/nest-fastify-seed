@@ -1,0 +1,12 @@
+{
+  "all": true,
+  "include": ["src/**/*.ts"],
+  "exclude": [
+    "src/config/**",
+    "src/kafka/consumers/**",
+    "src/main.ts",
+    "src/**/*.module.ts",
+    "**/*.spec.ts"
+  ],
+  "reporter": ["text", "html", "json"]
+}

@@ -1,0 +1,40 @@
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Build output
+dist
+*.tsbuildinfo
+
+# Tests
+tests
+coverage
+.nyc_output
+.c8rc.json
+.mocharc.json
+test.http
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Git / CI
+.git
+.github
+.husky
+
+# Docs
+docs
+*.md
+
+# Tooling
+.lintstagedrc.json
+.prettierrc
+oxlint.json
+.swcrc
+
+# OS / IDE
+.DS_Store
+.idea
+*.log
