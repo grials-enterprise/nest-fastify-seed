@@ -1,0 +1,10 @@
+@baseUrl = http://localhost:3000/defaults-service/api 
+@token = Bearer your_access_token
+
+# GOOD REQUEST
+GET {{baseUrl}}
+l-api-version: 1.0.0
+
+# BAD REQUEST
+GET {{baseUrl}}
+l-api-version: 1.0.1

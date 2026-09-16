@@ -1,0 +1,6 @@
+{
+  "node-option": ["import=@swc-node/register/esm-register"],
+  "timeout": 60000,
+  "recursive": true,
+  "exit": true
+}

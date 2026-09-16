@@ -1,0 +1,71 @@
+name: Release Please
+run-name: New Release Created by @${{ github.actor }}
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  ACR_URL: ${{ vars.AWS_ACR_URL }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  BUILD_TYPE: latest
+  RELEASE_TYPE: node
+  AWS_REGION: us-east-1
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    outputs:
+      release-status: ${{ steps.release.outputs.release_created }}
+      tag-name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - name: Set Image Name
+        run: |
+          echo "IMAGE_NAME=${GITHUB_REPOSITORY#*/}" >> $GITHUB_ENV
+          
+      - name: Release Please
+        uses: google-github-actions/release-please-action@v3
+        id: release
+        with:
+          release-type: ${{ env.RELEASE_TYPE }}
+          default-branch: master
+          package-name: ${{ env.IMAGE_NAME }}
+          pull-request-title-pattern: 'Release ${version} @ ${{ env.IMAGE_NAME }}'
+
+  build-images:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [release-please]
+    if: ${{ needs.release-please.outputs.release-status == 'true' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set Image Name
+        run: |
+          echo "IMAGE_NAME=${GITHUB_REPOSITORY#*/}" >> $GITHUB_ENV
+
+      - name: Login to AWS ECR with AWS CLI Container
+        run: |
+          aws_token=$(docker run --rm \
+            -e AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID }} \
+            -e AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY }} \
+            -e AWS_REGION=${{ env.AWS_REGION }} \
+            amazon/aws-cli:latest \
+            ecr get-login-password --region ${{ env.AWS_REGION }})
+          echo "$aws_token" | docker login ${{ env.ACR_URL }} --username AWS --password-stdin
+          
+      - name: Build Docker Image
+        run: |
+          docker build -t ${{ env.IMAGE_NAME }}:${{ env.BUILD_TYPE }} .
+         
+      - name: Push Docker Image to Artifact Registry    
+        run: |
+          docker tag ${{ env.IMAGE_NAME }}:${{ env.BUILD_TYPE }} ${{ env.ACR_URL }}/${{ env.IMAGE_NAME }}:${{ needs.release-please.outputs.tag-name }}
+          docker push ${{ env.ACR_URL }}/${{ env.IMAGE_NAME }}:${{ needs.release-please.outputs.tag-name }}
